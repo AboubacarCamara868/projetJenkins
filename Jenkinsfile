@@ -1,34 +1,38 @@
 pipeline {
   agent any
   options { timestamps() }
+  triggers { pollSCM('H/5 * * * *') }
   stages {
-    stage('Cloner le depot') {
+    stage('Checkout') {
       steps {
         git url: 'https://github.com/AboubacarCamara868/projetJenkins.git', branch: 'main'
-      }
-    }
-    stage('Etape 1 : Verification du depot') {
-      steps {
-        bat 'echo === Etape 1 : Verification du depot ==='
         bat 'git status'
       }
     }
-    stage('Etape 2 : Afficher le contenu du projet') {
+    stage('Build') {
       steps {
-        bat 'echo === Etape 2 : Afficher le contenu du projet ==='
-        bat 'dir'
+        bat 'echo === Build : preparation du livrable ==='
+        bat 'if exist dist rmdir /s /q dist'
+        bat 'mkdir dist'
+        bat 'copy index.html dist\\'
+        bat 'copy style.css dist\\'
+        bat 'dir dist'
       }
     }
-    stage('Etape 3 : Simuler un deploiement local') {
+    stage('Test') {
       steps {
-        bat 'echo === Etape 3 : Simuler un deploiement local ==='
-        bat 'echo Le fichier index.html est pret a etre affiche'
+        bat 'echo === Test : verification des fichiers ==='
+        bat 'if not exist dist\\index.html exit 1'
+        bat 'if not exist dist\\style.css exit 1'
+        bat 'findstr /C:"<h1>" dist\\index.html'
+        bat 'echo Tests OK'
       }
     }
-    stage('Etape 4 : Fin du build') {
+    stage('Delivery') {
       steps {
-        bat 'echo === Etape 4 : Fin du build ==='
-        bat 'echo SUCCESS'
+        bat 'echo === Delivery : livraison ==='
+        archiveArtifacts artifacts: 'dist/**', fingerprint: true
+        bat 'echo Le site est pret a etre affiche'
       }
     }
   }
