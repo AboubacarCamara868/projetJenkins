@@ -39,9 +39,16 @@ pipeline {
         }
       }
     }
+    stage('Deploy (Staging)') {
+      steps {
+        bat 'docker compose pull'
+        bat 'docker compose up -d'
+        bat 'docker ps'
+      }
+    }
   }
   post {
-    success { echo 'Build+Test+Push OK' }
-    failure { echo 'Build/Tests/Push KO' }
+    success { echo 'Build+Test+Push+Deploy OK' }
+    failure { echo 'Build/Tests/Push/Deploy KO' }
   }
 }
