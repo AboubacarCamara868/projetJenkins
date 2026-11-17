@@ -1,0 +1,6 @@
+services:
+  web:
+    image: aichatoucam/monapp:latest
+    ports:
+      - "8083:80"
+    restart: unless-stopped
