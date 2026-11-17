@@ -1,43 +1,47 @@
 pipeline {
   agent any
   options { timestamps() }
-  triggers { pollSCM('H/5 * * * *') }
+  environment {
+    IMAGE = 'aichatoucam/monapp'
+    TAG   = "build-${env.BUILD_NUMBER}"
+  }
   stages {
     stage('Checkout') {
+      steps { checkout scm }
+    }
+    stage('Docker Build') {
       steps {
-        git url: 'https://github.com/AboubacarCamara868/projetJenkins.git', branch: 'main'
-        bat 'git status'
+        bat 'docker version'
+        bat "docker build -t %IMAGE%:%TAG% ."
       }
     }
-    stage('Build') {
+    stage('Smoke Test') {
       steps {
-        bat 'echo === Build : preparation du livrable ==='
-        bat 'if exist dist rmdir /s /q dist'
-        bat 'mkdir dist'
-        bat 'copy index.html dist\\'
-        bat 'copy style.css dist\\'
-        bat 'dir dist'
+        bat """
+          docker rm -f monapp_test 2>nul || ver > nul
+          docker run -d --name monapp_test -p 8081:80 %IMAGE%:%TAG%
+          ping -n 3 127.0.0.1 > nul
+          curl -I http://localhost:8081 | find "200 OK"
+          docker rm -f monapp_test
+        """
       }
     }
-    stage('Test') {
+    stage('Push (Docker Hub)') {
       steps {
-        bat 'echo === Test : verification des fichiers ==='
-        bat 'if not exist dist\\index.html exit 1'
-        bat 'if not exist dist\\style.css exit 1'
-        bat 'findstr /C:"<h1>" dist\\index.html'
-        bat 'echo Tests OK'
-      }
-    }
-    stage('Delivery') {
-      steps {
-        bat 'echo === Delivery : livraison ==='
-        archiveArtifacts artifacts: 'dist/**', fingerprint: true
-        bat 'echo Le site est pret a etre affiche'
+        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds',
+                         usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+          bat """
+            echo %PASS%| docker login -u %USER% --password-stdin
+            docker tag %IMAGE%:%TAG% %IMAGE%:latest
+            docker push %IMAGE%:%TAG%
+            docker push %IMAGE%:latest
+          """
+        }
       }
     }
   }
   post {
-    success { echo 'Build OK' }
-    failure { echo 'Build KO' }
+    success { echo 'Build+Test+Push OK' }
+    failure { echo 'Build/Tests/Push KO' }
   }
 }
